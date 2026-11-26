@@ -12,6 +12,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -276,47 +279,76 @@ private fun ReactorButton(
 
     Box(
         modifier = Modifier
-            .size(210.dp)
+            .size(230.dp)
             .scale(if (connected || busy) pulse else 1f)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            Modifier
-                .size(190.dp)
-                .alpha(if (connected) 0.22f else 0.10f)
-                .background(if (connected) Green else Accent, CircleShape)
-        )
-        Box(
-            Modifier
-                .size(150.dp)
-                .alpha(0.9f)
-                .background(Panel, CircleShape)
-        )
-        Box(
-            Modifier
-                .size(96.dp)
-                .background(
-                    when {
-                        connected -> Green
-                        busy -> Accent
-                        else -> Accent
-                    },
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = when {
-                    busy -> "..."
-                    connected -> "OFF"
-                    else -> "GO"
-                },
-                color = Navy,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp
+        Canvas(Modifier.size(230.dp)) {
+            val c = center
+            val base = if (connected) Green else Accent
+
+            drawCircle(
+                color = base.copy(alpha = 0.08f),
+                radius = size.minDimension * 0.47f
+            )
+            drawCircle(
+                color = base.copy(alpha = 0.22f),
+                radius = size.minDimension * 0.41f,
+                style = Stroke(width = 7.dp.toPx())
+            )
+
+            // Segmented outer energy ring.
+            for (i in 0 until 8) {
+                drawArc(
+                    color = if (connected) Green else Color(0xFF5B6A7D),
+                    startAngle = i * 45f + 7f,
+                    sweepAngle = 28f,
+                    useCenter = false,
+                    style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+
+            // Inner cyan reactor ring.
+            for (i in 0 until 6) {
+                drawArc(
+                    color = if (connected) Green else Color(0xFF19D9FF),
+                    startAngle = i * 60f + 12f,
+                    sweepAngle = 38f,
+                    useCenter = false,
+                    style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+
+            drawCircle(
+                color = Panel,
+                radius = size.minDimension * 0.25f
+            )
+            drawCircle(
+                color = if (connected) Green else Color(0xFF19D9FF),
+                radius = size.minDimension * 0.19f
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.92f),
+                radius = size.minDimension * 0.09f
+            )
+            drawCircle(
+                color = base.copy(alpha = 0.45f),
+                radius = size.minDimension * 0.29f,
+                style = Stroke(width = 2.dp.toPx())
             )
         }
+
+        Text(
+            text = when {
+                busy -> "..."
+                connected -> "OFF"
+                else -> "GO"
+            },
+            color = Navy,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 20.sp
+        )
     }
 }
 
