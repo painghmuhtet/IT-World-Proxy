@@ -1,7 +1,11 @@
 package com.itworld.vpn
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -32,9 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val Navy = Color(0xFF07111F)
 private val Panel = Color(0xFF0E1D30)
@@ -51,15 +59,86 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun ITWorldProxyApp() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val controller = remember { WireGuardController(context) }
+
     var connected by remember { mutableStateOf(false) }
+    var connecting by remember { mutableStateOf(false) }
     var location by remember { mutableStateOf("Singapore") }
     var seconds by remember { mutableLongStateOf(0L) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (it.resultCode == Activity.RESULT_OK) {
+            scope.launch {
+                connecting = true
+                errorMessage = null
+                try {
+                    withContext(Dispatchers.IO) { controller.connect(location) }
+                    connected = true
+                    seconds = 0L
+                } catch (e: Exception) {
+                    errorMessage = e.message ?: "Unable to connect."
+                } finally {
+                    connecting = false
+                }
+            }
+        } else {
+            errorMessage = "VPN permission was not granted."
+        }
+    }
 
     LaunchedEffect(connected) {
         while (connected) {
             kotlinx.coroutines.delay(1000)
             seconds++
+        }
+    }
+
+    fun toggleConnection() {
+        if (connecting) return
+
+        if (connected) {
+            scope.launch {
+                connecting = true
+                try {
+                    withContext(Dispatchers.IO) { controller.disconnect() }
+                    connected = false
+                    seconds = 0L
+                    errorMessage = null
+                } catch (e: Exception) {
+                    errorMessage = e.message ?: "Unable to disconnect."
+                } finally {
+                    connecting = false
+                }
+            }
+            return
+        }
+
+        errorMessage = null
+
+        if (controller.isVpnPermissionRequired()) {
+            val intent = android.net.VpnService.prepare(context)
+            if (intent != null) {
+                vpnPermissionLauncher.launch(intent)
+                return
+            }
+        }
+
+        scope.launch {
+            connecting = true
+            try {
+                withContext(Dispatchers.IO) { controller.connect(location) }
+                connected = true
+                seconds = 0L
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "Unable to connect."
+            } finally {
+                connecting = false
+            }
         }
     }
 
@@ -98,7 +177,7 @@ private fun ITWorldProxyApp() {
             Row(
                 modifier = Modifier
                     .background(Panel, RoundedCornerShape(50.dp))
-                    .clickable {
+                    .clickable(enabled = !connected && !connecting) {
                         location = if (location == "Singapore") "Malaysia" else "Singapore"
                     }
                     .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -115,14 +194,23 @@ private fun ITWorldProxyApp() {
 
             ReactorButton(
                 connected = connected,
-                onClick = { connected = !connected }
+                busy = connecting,
+                onClick = ::toggleConnection
             )
 
             Spacer(Modifier.height(18.dp))
 
             Text(
-                text = if (connected) "CONNECTED" else "TAP TO CONNECT",
-                color = if (connected) Green else Color.White,
+                text = when {
+                    connecting -> "CONNECTING..."
+                    connected -> "CONNECTED"
+                    else -> "TAP TO CONNECT"
+                },
+                color = when {
+                    connected -> Green
+                    connecting -> Accent
+                    else -> Color.White
+                },
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
@@ -147,7 +235,7 @@ private fun ITWorldProxyApp() {
                     Text("PUBLIC IP", color = Muted, fontSize = 11.sp)
                     Spacer(Modifier.height(5.dp))
                     Text(
-                        if (connected) "VPN endpoint pending" else "Not connected",
+                        if (connected) "Connected — IP check next" else "Not connected",
                         color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
@@ -170,13 +258,17 @@ private fun ITWorldProxyApp() {
 }
 
 @Composable
-private fun ReactorButton(connected: Boolean, onClick: () -> Unit) {
+private fun ReactorButton(
+    connected: Boolean,
+    busy: Boolean,
+    onClick: () -> Unit
+) {
     val transition = rememberInfiniteTransition(label = "reactor")
     val pulse by transition.animateFloat(
         initialValue = 0.92f,
         targetValue = 1.06f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200),
+            animation = tween(if (busy) 500 else 1200),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse"
@@ -185,7 +277,7 @@ private fun ReactorButton(connected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(210.dp)
-            .scale(if (connected) pulse else 1f)
+            .scale(if (connected || busy) pulse else 1f)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -204,11 +296,22 @@ private fun ReactorButton(connected: Boolean, onClick: () -> Unit) {
         Box(
             Modifier
                 .size(96.dp)
-                .background(if (connected) Green else Accent, CircleShape),
+                .background(
+                    when {
+                        connected -> Green
+                        busy -> Accent
+                        else -> Accent
+                    },
+                    CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (connected) "ON" else "GO",
+                text = when {
+                    busy -> "..."
+                    connected -> "OFF"
+                    else -> "GO"
+                },
                 color = Navy,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 22.sp
