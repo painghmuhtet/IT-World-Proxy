@@ -54,6 +54,7 @@ private fun ITWorldProxyApp() {
     var connected by remember { mutableStateOf(false) }
     var location by remember { mutableStateOf("Singapore") }
     var seconds by remember { mutableLongStateOf(0L) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(connected) {
         while (connected) {
@@ -125,6 +126,15 @@ private fun ITWorldProxyApp() {
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp
             )
+
+            errorMessage?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = it,
+                    color = Color(0xFFFF6B6B),
+                    fontSize = 12.sp
+                )
+            }
 
             Spacer(Modifier.height(22.dp))
 
