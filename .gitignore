@@ -1,0 +1,13 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Secrets / WireGuard configs
+*.conf
+!app/src/main/assets/*.example.conf
