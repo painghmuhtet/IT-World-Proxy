@@ -28,8 +28,7 @@ chmod 700 "$WG_DIR/secrets"
 
 if [ ! -s "$WG_DIR/secrets/admin_password" ]; then
   umask 077
-  tr -dc 'A-Za-z0-9@#%+=_' </dev/urandom | head -c 24 > "$WG_DIR/secrets/admin_password"
-  printf '\n' >> "$WG_DIR/secrets/admin_password"
+  printf '%s\n' "$(openssl rand -hex 12)" > "$WG_DIR/secrets/admin_password"
 fi
 
 cat >"$WG_DIR/docker-compose.yml" <<'EOF'
