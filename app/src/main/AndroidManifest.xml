@@ -5,6 +5,8 @@
     <application
         android:allowBackup="false"
         android:label="IT World Proxy"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:theme="@style/Theme.ITWorldProxy">
         <activity
             android:name=".MainActivity"
